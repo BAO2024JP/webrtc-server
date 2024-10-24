@@ -19,29 +19,33 @@ export class Chat extends DurableObject {
 
 	webSocketMessage(ws, msg) {
 		const session = this.sessions.get(ws);
+		const messageData = JSON.parse(msg);
 		if(!session.id){
 			session.id = crypto.randomUUID()
+			session.from = messageData.from
 			ws.serializeAttachment({...ws.deserializeAttachment(), id:session.id})
-			ws.send(JSON.stringify({ready:true, id:session.id}))
+			ws.send(JSON.stringify({ready:true, id:session.id, from:session.from}))
 		}
-		this.broadcast(ws, msg)
+		this.broadcast(ws, messageData)
 	}
 	broadcast(sender, msg) {
 		const id = this.sessions.get(sender).id
+		const from = this.sessions.get(sender).from
 		for(let[ws] of this.sessions){
 			if( ws === sender) continue;
 			switch (typeof msg) {
 				case 'string':
-					ws.send(JSON.stringify({...JSON.parse(msg), id}))
+					ws.send(JSON.stringify({...JSON.parse(msg), id, from}))
 					break;
 				default:
-					ws.send(JSON.stringify({...msg, id}))
+					ws.send(JSON.stringify({...msg, id, from}))
 					break;
 			}
 		}
 	}
 	close(ws){
 		const session = this.sessions.get(ws)
+		console.log("session", session)
 		if(!session?.id) return
 		this.broadcast(ws, {type:'left'})
 		this.sessions.delete(ws)
